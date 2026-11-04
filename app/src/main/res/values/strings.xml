@@ -2,6 +2,7 @@
 <resources>
     <string name="byedpi_docs">https://github.com/hufrea/byedpi/blob/v0.13/README.md</string>
     <string name="app_name">Zapret Mobile</string>
+    <string name="preview_app_name">Zapret Preview</string>
     <string name="brand_byline">by lolososka</string>
 
     <string name="vpn_connect">Включить Zapret</string>
@@ -21,9 +22,9 @@
     <string name="logs_failed">Не удалось собрать журнал</string>
     <string name="proxy_address">%1$s:%2$s</string>
     <string name="telegram_card_title">Telegram</string>
-    <string name="telegram_proxy_off">ПРОКСИ ВЫКЛЮЧЕН</string>
-    <string name="telegram_proxy_starting">ЗАПУСК ПРОКСИ…</string>
-    <string name="telegram_proxy_ready">ПРОКСИ ДОСТУПЕН</string>
+    <string name="telegram_proxy_off">Прокси выключен</string>
+    <string name="telegram_proxy_starting">Подождите…</string>
+    <string name="telegram_proxy_ready">Прокси работает</string>
     <string name="telegram_proxy_address">MTProto WS  %1$s:%2$s</string>
     <string name="telegram_setup">Добавить в Telegram</string>
     <string name="telegram_setup_title">Прокси Telegram</string>
@@ -56,6 +57,8 @@
     <string name="messaging_compat">Совместимость с мессенджерами</string>
     <string name="dial_toggle">Включить или выключить Zapret</string>
     <string name="connection_uptime">Время %1$s · ping %2$s</string>
+    <string name="session_uptime">Время %1$s</string>
+    <string name="proxy_traffic_unavailable">Счётчик доступен в режиме VPN</string>
     <string name="connection_traffic">↓ %1$s   ↑ %2$s</string>
     <string name="metric_unavailable">—</string>
     <string name="mode_vpn_value">VPN</string>
@@ -142,6 +145,39 @@
     <string name="strategy_auto_waiting">Прокси не остановился. Повторите попытку.</string>
     <string name="strategy_auto_selected">Выбрана: %1$s</string>
     <string name="strategy_auto_failed">Проверка не удалась. Оставлена прежняя стратегия.</string>
+    <string name="brand_wordmark">ZAPRET</string>
+    <string name="mobile_byline">CONTROL CENTER · MOBILE</string>
+    <string name="telegram_quick_apply">Подключить</string>
+    <string name="telegram_proxy_toggle">Включить прокси Telegram</string>
+    <string name="telegram_tile">Telegram-прокси</string>
+    <string name="telegram_quick_open">Открыть Telegram</string>
+    <string name="media_check_title">YouTube и Discord</string>
+    <string name="media_check_hint">Проверка узлов и UDP. Видео и звонок проверяются в приложениях.</string>
+    <string name="media_check_start_first">Сначала включите Zapret</string>
+    <string name="media_auto_pick">Подобрать стратегию</string>
+    <string name="media_goal_title">Для чего подобрать?</string>
+    <string name="media_goal_all">YouTube и Discord</string>
+    <string name="media_goal_video">YouTube</string>
+    <string name="media_goal_voice">Discord и звонки</string>
+    <string name="media_probe_ok">отвечает</string>
+    <string name="media_probe_failed">нет ответа</string>
+    <string name="media_probe_skipped">не проверен</string>
+    <string name="media_check_summary">YouTube · %1$s\nВидеосервер · %2$s\nDiscord · %3$s\nUDP · %4$s\n\nЭто не проверка воспроизведения или звонка.</string>
+    <string name="media_probe_progress">%1$d из %2$d · %3$s</string>
+    <string name="media_goal_summary">Проверка: %1$s</string>
+    <string name="strategy_split">Разделение</string>
+    <string name="strategy_tls">TLS без подмены</string>
+    <string name="strategy_auto_description">Проверить узлы выбранных сервисов и сравнить профили</string>
+    <string name="strategy_split_description">TCP без подменных пакетов; UDP проходит без изменений</string>
+    <string name="strategy_tls_description">Разделение TCP и TLS у имени сайта; без подменных UDP-пакетов</string>
+    <string name="strategy_balanced_description">Перестановка TCP и один подменный UDP-пакет</string>
+    <string name="strategy_messaging_description">TCP и TLS у имени сайта; один подменный UDP-пакет</string>
+    <string name="strategy_games_description">Перестановка TCP и два подменных UDP-пакета</string>
+    <string name="strategy_strong_description">Подмена TCP с TTL и разделение TLS; может не подойти вашей сети</string>
+    <string name="mode_choose_hint">VPN — для приложений телефона. Локальный прокси — только для программ с ручной настройкой.</string>
+    <string name="proxy_mode_hint">Этот режим требует ручной настройки приложений. Для YouTube и Discord выберите VPN.</string>
+    <string name="tunnel_mtu">Размер пакета VPN (MTU)</string>
+    <string name="tunnel_mtu_summary">Переподключите Zapret после изменения. 1280 — если видео зависает в мобильной сети.</string>
 
     <string name="update_title">Обновление</string>
     <string name="update_current_version">Версия %1$s</string>

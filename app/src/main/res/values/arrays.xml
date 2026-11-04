@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string-array name="tunnel_mtu_values">
+        <item>1500</item>
+        <item>1400</item>
+        <item>1280</item>
+    </string-array>
     <array name="themes">
         <item name="system">Как в системе</item>
         <item name="light">Светлое</item>

@@ -14,6 +14,8 @@ import io.github.dovecoteescapee.byedpi.data.STARTED_BROADCAST
 import io.github.dovecoteescapee.byedpi.data.STOPPED_BROADCAST
 import io.github.dovecoteescapee.byedpi.data.Sender
 import io.github.dovecoteescapee.byedpi.services.ServiceTransitionCoordinator
+import io.github.dovecoteescapee.byedpi.fragments.MainSettingsFragment
+import io.github.dovecoteescapee.byedpi.utility.getPreferences
 
 /** Keeps service transactions alive while activities are recreated or absent. */
 class ZapretApplication : Application() {
@@ -31,6 +33,7 @@ class ZapretApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        MainSettingsFragment.setTheme(getPreferences().getString("app_theme", "dark") ?: "dark")
         ContextCompat.registerReceiver(
             this,
             transitionReceiver,

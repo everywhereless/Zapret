@@ -5,6 +5,32 @@ import android.content.SharedPreferences
 import io.github.dovecoteescapee.byedpi.R
 
 object StrategyProfiles {
+    private val configurationKeys = setOf(
+        "byedpi_strategy_profile", "byedpi_strategy_active_profile", "byedpi_strategy_config_version",
+        "byedpi_enable_cmd_settings", "byedpi_desync_method", "byedpi_split_position",
+        "byedpi_split_at_host", "byedpi_tlsrec_enabled", "byedpi_tlsrec_position",
+        "byedpi_tlsrec_at_sni", "byedpi_fake_ttl", "byedpi_fake_offset",
+        "byedpi_desync_http", "byedpi_desync_https", "byedpi_desync_udp", "byedpi_udp_fake_count",
+        "messaging_compat", "telegram_compat")
+
+    fun snapshot(preferences: SharedPreferences): Map<String, Any?> =
+        preferences.all.filterKeys { it in configurationKeys }
+
+    fun restore(preferences: SharedPreferences, snapshot: Map<String, Any?>) {
+        val editor = preferences.edit()
+        configurationKeys.forEach { key ->
+            when (val value = snapshot[key]) {
+                null -> editor.remove(key)
+                is String -> editor.putString(key, value)
+                is Boolean -> editor.putBoolean(key, value)
+                is Int -> editor.putInt(key, value)
+                is Long -> editor.putLong(key, value)
+                is Float -> editor.putFloat(key, value)
+                else -> error("Unexpected preset preference type")
+            }
+        }
+        editor.apply()
+    }
     const val KEY = "byedpi_strategy_profile"
     const val ACTIVE_KEY = "byedpi_strategy_active_profile"
     private const val CONFIG_VERSION_KEY = "byedpi_strategy_config_version"
@@ -74,6 +100,8 @@ object StrategyProfiles {
             true,
             2,
         ),
+        Split("split", R.string.strategy_split, "split", 1, false, false, false, 8, 0),
+        Tls("tls", R.string.strategy_tls, "split", 1, true, true, true, 8, 0),
         Strong(
             "strong",
             R.string.strategy_strong,

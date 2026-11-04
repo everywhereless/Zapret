@@ -33,6 +33,13 @@
             android:key="ipv6_enable"
             android:title="@string/ipv6_setting"
             android:defaultValue="false" />
+        <DropDownPreference
+            android:key="vpn_mtu"
+            android:title="@string/tunnel_mtu"
+            android:summary="@string/tunnel_mtu_summary"
+            android:entries="@array/tunnel_mtu_values"
+            android:entryValues="@array/tunnel_mtu_values"
+            android:defaultValue="1500" />
 
     </androidx.preference.PreferenceCategory>
 

@@ -16,6 +16,7 @@ import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyUIPreferences
 import io.github.dovecoteescapee.byedpi.core.ConnectionDiagnostics
 import io.github.dovecoteescapee.byedpi.core.Socks5Health
 import io.github.dovecoteescapee.byedpi.core.TProxyService
+import io.github.dovecoteescapee.byedpi.core.TunnelConfiguration
 import io.github.dovecoteescapee.byedpi.data.*
 import io.github.dovecoteescapee.byedpi.utility.*
 import kotlinx.coroutines.Dispatchers
@@ -276,21 +277,8 @@ class ByeDpiVpnService : LifecycleVpnService() {
         val dns = sharedPreferences.getStringNotNull("dns_ip", "1.1.1.1")
         val ipv6 = sharedPreferences.getBoolean("ipv6_enable", false)
 
-        val tun2socksConfig = """
-        | tunnel:
-        |   mtu: 8500
-        |
-        | socks5:
-        |   address: 127.0.0.1
-        |   port: $port
-        |   udp: udp
-        |
-        | misc:
-        |   task-stack-size: 86016
-        |   udp-recv-buffer-size: 1048576
-        |   udp-copy-buffer-nums: 32
-        |   udp-read-write-timeout: 120000
-        """.trimMargin("| ")
+        val mtu = TunnelConfiguration.mtu(sharedPreferences.getString("vpn_mtu", null))
+        val tun2socksConfig = TunnelConfiguration.yaml(port, mtu)
 
         val configPath = try {
             File.createTempFile("config", "tmp", cacheDir).apply {
@@ -302,7 +290,7 @@ class ByeDpiVpnService : LifecycleVpnService() {
         }
         tunConfigFile = configPath
 
-        val fd = createBuilder(dns, ipv6).establish()
+        val fd = createBuilder(dns, ipv6).setMtu(mtu).establish()
             ?: throw IllegalStateException("VPN connection failed")
 
         this.tunFd = fd

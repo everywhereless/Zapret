@@ -11,7 +11,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.net.TrafficStats
 import android.net.VpnService
 import android.os.Build
 import android.os.Bundle
@@ -37,6 +36,8 @@ import io.github.dovecoteescapee.byedpi.databinding.ActivityMainBinding
 import io.github.dovecoteescapee.byedpi.core.StrategyProfiles
 import io.github.dovecoteescapee.byedpi.core.StrategyProbeCoordinator
 import io.github.dovecoteescapee.byedpi.core.StrategyProbeResult
+import io.github.dovecoteescapee.byedpi.core.MediaProbePolicy
+import io.github.dovecoteescapee.byedpi.core.TProxyService
 import io.github.dovecoteescapee.byedpi.core.StrategyProbeProxyRunner
 import io.github.dovecoteescapee.byedpi.core.Socks5UdpProbe
 import io.github.dovecoteescapee.byedpi.core.ByeDpiProxyPreferences
@@ -71,13 +72,11 @@ import javax.net.ssl.HttpsURLConnection
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private var metricsJob: Job? = null
-    private var pingJob: Job? = null
     private var strategyProbeJob: Job? = null
     private var telegramStartJob: Job? = null
+    private var mediaCheckJob: Job? = null
+    private var updatingTelegramSwitch = false
     private var connectionStartedAt = 0L
-    private var rxBaseline = 0L
-    private var txBaseline = 0L
-    @Volatile private var lastPingMs: Long? = null
     private var restartModeAfterProfile: Mode? = null
     private val strategyProbeInProgress: Boolean
         get() = StrategyProbeCoordinator.isActive
@@ -93,16 +92,7 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_AUTO_START = "io.github.lolososka.zapretmobile.AUTO_START"
         private const val STATE_RESTART_MODE_AFTER_PROFILE = "main.restart_mode_after_profile"
         private val TAG: String = MainActivity::class.java.simpleName
-        private val PROBE_TARGETS = listOf(
-            ProbeTarget("discord.com", "discord-core"),
-            ProbeTarget("gateway.discord.gg", "discord-gateway"),
-            ProbeTarget("discord.media", "discord-media"),
-            ProbeTarget("www.youtube.com", "youtube-core"),
-            ProbeTarget("redirector.googlevideo.com", "youtube-media"),
-            ProbeTarget("youtubei.googleapis.com", "youtube-api"),
-            ProbeTarget("telegram.org", "telegram"),
-        )
-        private val REQUIRED_PROBE_PRODUCTS = setOf("discord-core", "youtube-core")
+        private val PROBE_TARGETS = MediaProbePolicy.targets
         private val PRIORITY_PROBE_PRODUCTS = setOf(
             "discord-gateway",
             "discord-media",
@@ -110,7 +100,6 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private data class ProbeTarget(val host: String, val product: String)
     private fun collectLogs(minimal: Boolean): String? = try {
         val preferences = getPreferences()
         val config = runCatching {
@@ -295,6 +284,11 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+                launch {
+                    combine(TelegramWsProxyService.running, TelegramWsProxyService.starting,
+                        TelegramWsProxyService.port) { _, _, _ -> Unit }
+                        .collect { updateTelegramStatus() }
+                }
                 combine(
                     StrategyProbeCoordinator.active,
                     ServiceTransitionCoordinator.active,
@@ -324,16 +318,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.routeDial.setOnClickListener { toggleConnection() }
-        binding.routeDial.setOnTouchListener { view, event ->
-            when (event.actionMasked) {
-                android.view.MotionEvent.ACTION_DOWN -> animateDialPress(view, pressed = true)
-
-                android.view.MotionEvent.ACTION_UP,
-                android.view.MotionEvent.ACTION_CANCEL -> animateDialPress(view, pressed = false)
-            }
-            false
-        }
-        binding.modeRow.setOnClickListener { toggleMode() }
+        binding.modeRow.setOnClickListener { showModeChoice() }
         binding.settingsButton.setOnClickListener { openSettings() }
         binding.strategyBadge.setOnClickListener {
             if (controlsLocked) return@setOnClickListener
@@ -342,7 +327,29 @@ class MainActivity : AppCompatActivity() {
                 ?.second
             profilePickerRegister.launch(Intent(this, StrategyPickerActivity::class.java))
         }
-        binding.telegramSetupButton.setOnClickListener { showTelegramSetup() }
+        binding.telegramSetupButton.setOnClickListener {
+            if (TelegramWsProxyService.starting.value) return@setOnClickListener
+            if (TelegramWsProxyService.running.value) openTelegramProxyLink(telegramProxyLink())
+            else startTelegramAndApply()
+        }
+        binding.telegramSetupButton.setOnLongClickListener { showTelegramSetup(); true }
+        binding.telegramSwitch.setOnCheckedChangeListener { _, checked ->
+            if (updatingTelegramSwitch) return@setOnCheckedChangeListener
+            try {
+                if (checked) TelegramWsProxyService.start(this) else TelegramWsProxyService.stop(this)
+            } catch (_: RuntimeException) {
+                Toast.makeText(this, R.string.telegram_ws_failed, Toast.LENGTH_LONG).show()
+            }
+            updateTelegramStatus()
+        }
+        binding.updatesButton.setOnClickListener { startActivity(Intent(this, UpdateActivity::class.java)) }
+        binding.checkButton.setOnClickListener { checkMedia() }
+        binding.autoPickButton.setOnClickListener {
+            if (strategyProbeInProgress) {
+                strategyProbeJob?.cancel()
+                binding.autoPickButton.isEnabled = false
+            } else chooseAutoGoal()
+        }
         binding.saveLogsButton.setOnClickListener { saveLogs() }
 
         val theme = getPreferences()
@@ -372,9 +379,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         metricsJob?.cancel()
-        pingJob?.cancel()
         strategyProbeJob?.cancel()
         telegramStartJob?.cancel()
+        mediaCheckJob?.cancel()
         super.onDestroy()
         unregisterReceiver(receiver)
     }
@@ -469,11 +476,101 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun toggleConnection() {
-        if (controlsLocked) return
+        if (controlsLocked || mediaCheckJob?.isActive == true) return
         when (appStatus.first) {
             AppStatus.Halted -> start()
             AppStatus.Running -> stop()
         }
+    }
+
+    private fun chooseAutoGoal() {
+        if (controlsLocked || mediaCheckJob?.isActive == true) return
+        val goals = MediaProbePolicy.Goal.entries
+        AlertDialog.Builder(this).setTitle(R.string.media_goal_title)
+            .setItems(arrayOf(getString(R.string.media_goal_all), getString(R.string.media_goal_video),
+                getString(R.string.media_goal_voice))) { _, index ->
+                getPreferences().edit().putString(MediaProbePolicy.GOAL_KEY, goals[index].id).apply()
+                val running = appStatus.first == AppStatus.Running
+                val mode = if (running) appStatus.second else getPreferences().mode()
+                startAutoStrategyProbeWithPermission(mode, shouldRunAfterProbe = running)
+            }.setNegativeButton(android.R.string.cancel, null).show()
+    }
+
+    private fun mediaSummary(result: StrategyProbeResult): String {
+        fun state(ok: Boolean) = getString(if (ok) R.string.media_probe_ok else R.string.media_probe_failed)
+        fun product(id: String) = if (id in result.attemptedProducts)
+            state(id in result.successfulProducts) else getString(R.string.media_probe_skipped)
+        return getString(R.string.media_check_summary,
+            product("youtube-core"), product("youtube-media"),
+            if ("discord-core" !in result.attemptedProducts) getString(R.string.media_probe_skipped)
+            else state("discord-core" in result.successfulProducts && "discord-gateway" in result.successfulProducts),
+            state(result.udpLatencyMs != null))
+    }
+
+    private fun checkMedia() {
+        if (controlsLocked || mediaCheckJob?.isActive == true) return
+        if (appStatus.first != AppStatus.Running) {
+            Toast.makeText(this, R.string.media_check_start_first, Toast.LENGTH_SHORT).show()
+            return
+        }
+        mediaCheckJob = lifecycleScope.launch {
+            binding.checkButton.isEnabled = false
+            binding.checkProgress.visibility = View.VISIBLE
+            setStrategyProbeControls(false)
+            try {
+                val config = ByeDpiProxyUIPreferences(getPreferences())
+                val host = when (config.ip.trim()) {
+                    "", "0.0.0.0" -> "127.0.0.1"
+                    "::", "[::]" -> "::1"
+                    else -> config.ip.trim()
+                }
+                val result = probeBlockedEndpoints(host, config.port)
+                binding.checkResult.text = mediaSummary(result)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                ConnectionDiagnostics.record(this@MainActivity, "Media check", error)
+                binding.checkResult.setText(R.string.update_check_failed)
+            } finally {
+                mediaCheckJob = null
+                if (!isDestroyed) {
+                    binding.checkProgress.visibility = View.GONE
+                    setStrategyProbeControls(!controlsLocked)
+                }
+            }
+        }
+    }
+
+    private fun updateTelegramStatus() {
+        val busy = TelegramWsProxyService.starting.value
+        val running = TelegramWsProxyService.running.value
+        updatingTelegramSwitch = true
+        binding.telegramSwitch.isChecked = running || busy
+        binding.telegramSwitch.isEnabled = !busy
+        updatingTelegramSwitch = false
+        binding.telegramSetupButton.isEnabled = !busy
+        binding.telegramProxyStatus.setText(when {
+            busy -> R.string.telegram_proxy_starting
+            running -> R.string.telegram_proxy_ready
+            else -> R.string.telegram_proxy_off
+        })
+    }
+
+    private fun showModeChoice() {
+        if (controlsLocked) return
+        val current = if (appStatus.first == AppStatus.Running) appStatus.second else getPreferences().mode()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.mode_setting)
+            .setSingleChoiceItems(arrayOf(getString(R.string.mode_vpn_value),
+                getString(R.string.mode_proxy_value)), if (current == Mode.VPN) 0 else 1) { dialog, which ->
+                dialog.dismiss()
+                if ((which == 0) != (current == Mode.VPN)) toggleMode()
+            }
+            .setNeutralButton(R.string.mode_switch) { _, _ ->
+                AlertDialog.Builder(this).setMessage(R.string.mode_choose_hint)
+                    .setPositiveButton(android.R.string.ok, null).show()
+            }
+            .setNegativeButton(android.R.string.cancel, null).show()
     }
 
     private fun toggleMode() {
@@ -535,6 +632,8 @@ class MainActivity : AppCompatActivity() {
         strategyProbeJob = lifecycleScope.launch {
             val preferences = getPreferences()
             val previousActive = StrategyProfiles.active(preferences)
+            val previousConfiguration = StrategyProfiles.snapshot(preferences)
+            var configurationChanged = false
             val probeRunner = StrategyProbeProxyRunner()
             var completed = false
             var probeStop: ServiceTransitionCoordinator.ProbeStop? = null
@@ -586,6 +685,8 @@ class MainActivity : AppCompatActivity() {
                 val proxyPort = baseProxyPreferences.port
                 val candidates = buildList {
                     add(previousActive)
+                    add(StrategyProfiles.Profile.Split)
+                    add(StrategyProfiles.Profile.Tls)
                     add(StrategyProfiles.Profile.Strong)
                     add(StrategyProfiles.Profile.Messaging)
                     add(StrategyProfiles.Profile.Games)
@@ -594,23 +695,31 @@ class MainActivity : AppCompatActivity() {
 
                 var selected: StrategyProfiles.Profile? = null
                 var selectedResult: StrategyProbeResult? = null
+                val goal = MediaProbePolicy.Goal.fromId(preferences.getString(MediaProbePolicy.GOAL_KEY, null))
+                val priority = goal.required + PRIORITY_PROBE_PRODUCTS.filter { product ->
+                    if (goal == MediaProbePolicy.Goal.Video) product.startsWith("youtube")
+                    else if (goal == MediaProbePolicy.Goal.Voice) product.startsWith("discord") else true
+                }
+                binding.checkProgress.visibility = View.VISIBLE
                 for ((index, candidate) in candidates.withIndex()) {
+                    binding.checkResult.text = getString(R.string.media_probe_progress,
+                        index + 1, candidates.size, getString(candidate.title))
                     val proxyPreferences = StrategyProfiles.candidatePreferences(
                         baseProxyPreferences,
                         candidate,
                     )
                     if (!probeRunner.start(proxyPreferences)) continue
                     val result = try {
-                        probeBlockedEndpoints(proxyIp, proxyPort)
+                        probeBlockedEndpoints(proxyIp, proxyPort, goal)
                     } finally {
                         probeRunner.stop()
                     }
-                    if (result.isEligible(REQUIRED_PROBE_PRODUCTS) &&
+                    if (result.isEligible(goal.required, requireUdp = goal.requireUdp) &&
                         result.isBetterThan(
                             selectedResult,
-                            PRIORITY_PROBE_PRODUCTS,
-                            mediaReady = candidate.mediaReady,
-                            otherMediaReady = selected?.mediaReady == true,
+                            priority,
+                            mediaReady = result.udpLatencyMs != null,
+                            otherMediaReady = selectedResult?.udpLatencyMs != null,
                         )
                     ) {
                         selected = candidate
@@ -620,14 +729,18 @@ class MainActivity : AppCompatActivity() {
                     // the UDP relay are healthy. A frontend-only TLS success is
                     // not enough for YouTube playback or Discord calls.
                     if (index == 0 &&
-                        candidate.mediaReady &&
-                        result.udpLatencyMs != null &&
-                        result.successes == PROBE_TARGETS.size
+                        result.isEligible(goal.required, requireUdp = goal.requireUdp) &&
+                        result.successes == PROBE_TARGETS.count { goalIncludes(goal, it) }
                     ) break
                 }
 
                 val chosen = selected ?: previousActive
-                StrategyProfiles.applyAutoCandidate(preferences, chosen)
+                binding.checkResult.text = selectedResult?.let { mediaSummary(it) }
+                    ?: getString(R.string.strategy_auto_failed)
+                if (selected != null) {
+                    StrategyProfiles.applyAutoCandidate(preferences, chosen)
+                    configurationChanged = true
+                }
                 preferences.edit()
                     .putString("byedpi_mode", targetMode.name.lowercase(Locale.ROOT))
                     .apply()
@@ -679,11 +792,16 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     completed = true
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                ConnectionDiagnostics.record(this@MainActivity, "Strategy probe", error)
+                if (!isDestroyed) binding.checkResult.setText(R.string.strategy_auto_failed)
             } finally {
                 withContext(NonCancellable) {
                     probeRunner.stop()
                     if (!completed) {
-                        StrategyProfiles.applyAutoCandidate(preferences, previousActive)
+                        if (configurationChanged) StrategyProfiles.restore(preferences, previousConfiguration)
                         preferences.edit()
                             .putString("byedpi_mode", targetMode.name.lowercase(Locale.ROOT))
                             .apply()
@@ -708,6 +826,7 @@ class MainActivity : AppCompatActivity() {
                 strategyProbeJob = null
                 StrategyProbeCoordinator.finish()
                 if (!isDestroyed) {
+                    binding.checkProgress.visibility = View.GONE
                     setStrategyProbeControls(enabled = true)
                     updateStatus()
                 }
@@ -731,11 +850,17 @@ class MainActivity : AppCompatActivity() {
             (expectedMode == null || appStatus.second == expectedMode)
     }
 
-    private suspend fun probeBlockedEndpoints(proxyIp: String, proxyPort: Int): StrategyProbeResult =
+    private fun goalIncludes(goal: MediaProbePolicy.Goal, target: MediaProbePolicy.Target): Boolean =
+        goal == MediaProbePolicy.Goal.All ||
+            (goal == MediaProbePolicy.Goal.Video && target.product.startsWith("youtube")) ||
+            (goal == MediaProbePolicy.Goal.Voice && target.product.startsWith("discord"))
+
+    private suspend fun probeBlockedEndpoints(proxyIp: String, proxyPort: Int,
+        goal: MediaProbePolicy.Goal = MediaProbePolicy.Goal.All): StrategyProbeResult =
         coroutineScope {
-            val endpoints = PROBE_TARGETS.map { target ->
+            val endpoints = PROBE_TARGETS.filter { goalIncludes(goal, it) }.map { target ->
                 async(Dispatchers.IO) {
-                    target.product to probeEndpoint(proxyIp, proxyPort, target.host)
+                    target.product to probeEndpoint(proxyIp, proxyPort, target)
                 }
             }
             val udp = async(Dispatchers.IO) {
@@ -747,7 +872,8 @@ class MainActivity : AppCompatActivity() {
             )
         }
 
-    private fun probeEndpoint(proxyIp: String, proxyPort: Int, host: String): Long? {
+    private fun probeEndpoint(proxyIp: String, proxyPort: Int, target: MediaProbePolicy.Target): Long? {
+        val host = target.host
         val startedAt = SystemClock.elapsedRealtime()
         return try {
             Socket().use { socket ->
@@ -803,6 +929,18 @@ class MainActivity : AppCompatActivity() {
                                 !HttpsURLConnection.getDefaultHostnameVerifier()
                                     .verify(host, it.session)
                             ) return null
+                            it.getOutputStream().apply {
+                                write(("GET " + target.path + " HTTP/1.1\r\nHost: " + host +
+                                    "\r\nUser-Agent: Zapret-Mobile-Probe\r\nConnection: close\r\n\r\n")
+                                    .toByteArray(Charsets.US_ASCII))
+                                flush()
+                            }
+                            val statusLine = MediaProbePolicy.readStatusLine(it.getInputStream()) {
+                                val remaining = 12_000L - (SystemClock.elapsedRealtime() - startedAt)
+                                if (remaining <= 0L) throw java.net.SocketTimeoutException("HTTP probe deadline")
+                                it.soTimeout = remaining.coerceAtMost(3_500L).toInt()
+                            } ?: return null
+                            if (!MediaProbePolicy.acceptsStatus(statusLine, target.allowNotFound)) return null
                         }
                 SystemClock.elapsedRealtime() - startedAt
             }
@@ -982,13 +1120,9 @@ class MainActivity : AppCompatActivity() {
             "127.0.0.1",
             TelegramWsProxyService.portForLink(this).toString(),
         )
-        binding.telegramProxyStatus.setText(
-            when {
-                TelegramWsProxyService.running.value -> R.string.telegram_proxy_ready
-                TelegramWsProxyService.starting.value -> R.string.telegram_proxy_starting
-                else -> R.string.telegram_proxy_off
-            }
-        )
+        updateTelegramStatus()
+        binding.proxyAddress.visibility = if (selectedMode == Mode.Proxy) View.VISIBLE else View.GONE
+        binding.modeHint.visibility = if (selectedMode == Mode.Proxy) View.VISIBLE else View.GONE
         binding.modeValue.setText(
             when (selectedMode) {
                 Mode.VPN -> R.string.mode_vpn_value
@@ -1061,29 +1195,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setStrategyProbeControls(enabled: Boolean) {
-        binding.routeDial.isEnabled = enabled
-        binding.statusButton.isEnabled = enabled
-        binding.modeRow.isEnabled = enabled
-        binding.strategyBadge.isEnabled = enabled
-        binding.settingsButton.isEnabled = enabled
-    }
-
-    private fun animateDialPress(view: View, pressed: Boolean) {
-        view.animate().cancel()
-        if (!uiAnimationsEnabled()) {
-            view.scaleX = if (pressed) 0.97f else 1f
-            view.scaleY = if (pressed) 0.97f else 1f
-            view.alpha = if (pressed) 0.94f else 1f
-            return
-        }
-
-        view.animate()
-            .scaleX(if (pressed) 0.97f else 1f)
-            .scaleY(if (pressed) 0.97f else 1f)
-            .alpha(if (pressed) 0.94f else 1f)
-            .setDuration(if (pressed) 150L else 240L)
-            .setInterpolator(if (pressed) pressInInterpolator else pressOutInterpolator)
-            .start()
+        val safeEnabled = enabled && mediaCheckJob?.isActive != true
+        binding.routeDial.isEnabled = safeEnabled
+        binding.statusButton.isEnabled = safeEnabled
+        binding.modeRow.isEnabled = safeEnabled
+        binding.strategyBadge.isEnabled = safeEnabled
+        binding.settingsButton.isEnabled = safeEnabled
+        binding.checkButton.isEnabled = safeEnabled
+        binding.autoPickButton.isEnabled = (strategyProbeInProgress && strategyProbeJob?.isActive == true) ||
+            safeEnabled
+        binding.autoPickButton.setText(if (strategyProbeInProgress) android.R.string.cancel else R.string.media_auto_pick)
     }
 
     private fun animateConnectionState() {
@@ -1133,22 +1254,12 @@ class MainActivity : AppCompatActivity() {
     private fun startMetricsLoop() {
         if (connectionStartedAt == 0L) {
             connectionStartedAt = SystemClock.elapsedRealtime()
-            rxBaseline = supportedBytes(TrafficStats.getTotalRxBytes())
-            txBaseline = supportedBytes(TrafficStats.getTotalTxBytes())
-            lastPingMs = null
         }
         if (metricsJob?.isActive == true) return
         metricsJob = lifecycleScope.launch {
-            var nextPingAt = 0L
             while (isActive && appStatus.first == AppStatus.Running) {
                 val now = SystemClock.elapsedRealtime()
                 updateMetrics(now)
-                if (now >= nextPingAt && pingJob?.isActive != true) {
-                    nextPingAt = now + 5_000L
-                    pingJob = launch(Dispatchers.IO) {
-                        lastPingMs = measurePing()
-                    }
-                }
                 delay(1_000L)
             }
         }
@@ -1156,16 +1267,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun stopMetricsLoop() {
         metricsJob?.cancel()
-        pingJob?.cancel()
         metricsJob = null
-        pingJob = null
         connectionStartedAt = 0L
-        lastPingMs = null
-        binding.connectionUptime.text = getString(
-            R.string.connection_uptime,
-            "00:00:00",
-            getString(R.string.metric_unavailable),
-        )
+        binding.connectionUptime.text = getString(R.string.session_uptime, "00:00:00")
         binding.connectionTraffic.text = getString(
             R.string.connection_traffic,
             "0 Б",
@@ -1179,32 +1283,20 @@ class MainActivity : AppCompatActivity() {
         val minutes = (elapsed % 3_600L) / 60L
         val seconds = elapsed % 60L
         val uptime = String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes, seconds)
-        val ping = lastPingMs?.let { "$it мс" } ?: getString(R.string.metric_unavailable)
-        val rx = (supportedBytes(TrafficStats.getTotalRxBytes()) - rxBaseline).coerceAtLeast(0L)
-        val tx = (supportedBytes(TrafficStats.getTotalTxBytes()) - txBaseline).coerceAtLeast(0L)
-        binding.connectionUptime.text = getString(R.string.connection_uptime, uptime, ping)
-        binding.connectionTraffic.text = getString(
-            R.string.connection_traffic,
-            formatBytes(rx),
-            formatBytes(tx),
-        )
+        binding.connectionUptime.text = getString(R.string.session_uptime, uptime)
+        val stats = if (appStatus.second == Mode.VPN) runCatching {
+            TProxyService.TProxyGetStats().takeIf { it.size == 4 }
+        }.getOrNull() else null
+        binding.connectionTraffic.text = if (stats == null) getString(R.string.proxy_traffic_unavailable)
+        else getString(R.string.connection_traffic,
+            formatBytes(stats[3].coerceAtLeast(0L)), formatBytes(stats[1].coerceAtLeast(0L)))
     }
 
-    private fun measurePing(): Long? {
-        val socket = Socket()
-        val started = SystemClock.elapsedRealtime()
-        return try {
-            socket.connect(InetSocketAddress("1.1.1.1", 443), 900)
-            SystemClock.elapsedRealtime() - started
-        } catch (_: IOException) {
-            null
-        } finally {
-            runCatching { socket.close() }
-        }
+    override fun onStop() {
+        metricsJob?.cancel()
+        metricsJob = null
+        super.onStop()
     }
-
-    private fun supportedBytes(value: Long): Long =
-        if (value == TrafficStats.UNSUPPORTED.toLong() || value < 0L) 0L else value
 
     private fun uiAnimationsEnabled(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled()

@@ -6,6 +6,7 @@ data class StrategyProbeResult(
     val successfulProducts: Set<String>,
     val latencyMs: Long,
     val udpLatencyMs: Long?,
+    val attemptedProducts: Set<String> = emptySet(),
 ) {
     val products: Int
         get() = successfulProducts.size
@@ -45,6 +46,7 @@ data class StrategyProbeResult(
                 latencyMs = successful.mapNotNull { it.second }.sum() +
                     (udpLatencyMs ?: 0L),
                 udpLatencyMs = udpLatencyMs,
+                attemptedProducts = results.map { it.first }.toSet(),
             )
         }
     }

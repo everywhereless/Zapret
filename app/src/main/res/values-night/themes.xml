@@ -6,7 +6,7 @@
         <item name="colorOnPrimary">@color/zapret_instrument_text</item>
         <item name="colorSecondary">@color/zapret_violet</item>
         <item name="colorSecondaryVariant">@color/zapret_violet_dark</item>
-        <item name="colorOnSecondary">@color/white</item>
+        <item name="colorOnSecondary">@color/zapret_mist</item>
         <item name="colorSurface">@color/zapret_porcelain</item>
         <item name="colorOnSurface">@color/zapret_ink</item>
         <item name="android:colorBackground">@color/zapret_mist</item>

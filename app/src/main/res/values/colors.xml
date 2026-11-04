@@ -3,25 +3,25 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- Zapret Mobile: graphite console + violet signal. -->
-    <color name="zapret_mist">#080B10</color>
-    <color name="zapret_porcelain">#111720</color>
-    <color name="zapret_ink">#F3F5F8</color>
-    <color name="zapret_muted">#9AA3B1</color>
-    <color name="zapret_line">#252D38</color>
-    <color name="zapret_violet">#8274FF</color>
-    <color name="zapret_violet_dark">#6653F3</color>
-    <color name="zapret_violet_soft">#AA9FFF</color>
+    <!-- Shared monochrome direction with Zapret Control Center. Legacy names stay compatible. -->
+    <color name="zapret_mist">#F7F7F7</color>
+    <color name="zapret_porcelain">#FFFFFF</color>
+    <color name="zapret_ink">#171717</color>
+    <color name="zapret_muted">#626262</color>
+    <color name="zapret_line">#DDDDDD</color>
+    <color name="zapret_violet">#171717</color>
+    <color name="zapret_violet_dark">#303030</color>
+    <color name="zapret_violet_soft">#111111</color>
     <!-- Brand mark shared with the Windows app icon. -->
-    <color name="zapret_mark_violet">#8B57FF</color>
-    <color name="zapret_mark_ink">#0B0D12</color>
-    <color name="zapret_blue">#3E7BFA</color>
-    <color name="zapret_rose">#ED5B86</color>
-    <color name="zapret_mint">#91E6C4</color>
-    <color name="zapret_instrument">#080B10</color>
-    <color name="zapret_instrument_surface">#111720</color>
-    <color name="zapret_instrument_text">#F7F8FA</color>
-    <color name="zapret_instrument_muted">#8C95A3</color>
-    <color name="dial_quiet">#2D3542</color>
-    <color name="dial_quiet_strong">#667183</color>
+    <color name="zapret_mark_violet">#171717</color>
+    <color name="zapret_mark_ink">#F7F7F7</color>
+    <color name="zapret_blue">#333333</color>
+    <color name="zapret_rose">#777777</color>
+    <color name="zapret_mint">#B8D7C7</color>
+    <color name="zapret_instrument">#F7F7F7</color>
+    <color name="zapret_instrument_surface">#ECECEC</color>
+    <color name="zapret_instrument_text">#171717</color>
+    <color name="zapret_instrument_muted">#626262</color>
+    <color name="dial_quiet">#DDDDDD</color>
+    <color name="dial_quiet_strong">#777777</color>
 </resources>

@@ -20,7 +20,7 @@ class MainSettingsFragment : PreferenceFragmentCompat() {
         fun setTheme(name: String) =
             themeByName(name)?.let {
                 AppCompatDelegate.setDefaultNightMode(it)
-            } ?: throw IllegalStateException("Invalid value for app_theme: $name")
+            } ?: AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
 
         private fun themeByName(name: String): Int? = when (name) {
             "system" -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM

@@ -10,36 +10,30 @@ import io.github.dovecoteescapee.byedpi.core.StrategyProfiles
 import io.github.dovecoteescapee.byedpi.utility.getPreferences
 
 class StrategyPickerActivity : AppCompatActivity() {
-    private lateinit var autoCard: MaterialCardView
-    private lateinit var balancedCard: MaterialCardView
-    private lateinit var messagingCard: MaterialCardView
-    private lateinit var gamesCard: MaterialCardView
-    private lateinit var strongCard: MaterialCardView
+    private lateinit var cards: Map<StrategyProfiles.Profile, MaterialCardView>
     private var selected = StrategyProfiles.Profile.Balanced
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_strategy_picker)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
-        supportActionBar?.title = getString(R.string.strategy_picker_title)
-
-        autoCard = findViewById(R.id.strategy_auto_card)
-        balancedCard = findViewById(R.id.strategy_balanced_card)
-        messagingCard = findViewById(R.id.strategy_messaging_card)
-        gamesCard = findViewById(R.id.strategy_games_card)
-        strongCard = findViewById(R.id.strategy_strong_card)
-        listOf(autoCard, balancedCard, messagingCard, gamesCard, strongCard).forEach { card ->
+        supportActionBar?.setTitle(R.string.strategy_picker_title)
+        val ids = mapOf(
+            StrategyProfiles.Profile.Auto to R.id.strategy_auto_card,
+            StrategyProfiles.Profile.Balanced to R.id.strategy_balanced_card,
+            StrategyProfiles.Profile.Split to R.id.strategy_split_card,
+            StrategyProfiles.Profile.Tls to R.id.strategy_tls_card,
+            StrategyProfiles.Profile.Messaging to R.id.strategy_messaging_card,
+            StrategyProfiles.Profile.Games to R.id.strategy_games_card,
+            StrategyProfiles.Profile.Strong to R.id.strategy_strong_card)
+        cards = ids.mapValues { (_, id) -> findViewById(id) }
+        cards.forEach { (profile, card) ->
             card.isCheckable = true
-            card.isFocusable = true
+            card.contentDescription = getString(profile.title)
+            card.setOnClickListener { select(profile) }
         }
-        selected = StrategyProfiles.selected(getPreferences())
-        select(selected)
-
-        autoCard.setOnClickListener { select(StrategyProfiles.Profile.Auto) }
-        balancedCard.setOnClickListener { select(StrategyProfiles.Profile.Balanced) }
-        messagingCard.setOnClickListener { select(StrategyProfiles.Profile.Messaging) }
-        gamesCard.setOnClickListener { select(StrategyProfiles.Profile.Games) }
-        strongCard.setOnClickListener { select(StrategyProfiles.Profile.Strong) }
+        val restored = savedInstanceState?.getString("selected_profile")
+        select(StrategyProfiles.Profile.entries.firstOrNull { it.id == restored }
+            ?: StrategyProfiles.selected(getPreferences()))
         findViewById<com.google.android.material.button.MaterialButton>(R.id.strategy_apply_button)
             .setOnClickListener {
                 StrategyProfiles.apply(getPreferences(), selected)
@@ -47,37 +41,22 @@ class StrategyPickerActivity : AppCompatActivity() {
                 finish()
             }
     }
-
     private fun select(profile: StrategyProfiles.Profile) {
         selected = profile
-        val selectedColor = ContextCompat.getColor(this, R.color.zapret_violet)
-        val normalColor = ContextCompat.getColor(this, R.color.zapret_line)
-        autoCard.strokeColor = if (profile == StrategyProfiles.Profile.Auto) selectedColor else normalColor
-        balancedCard.strokeColor = if (profile == StrategyProfiles.Profile.Balanced) selectedColor else normalColor
-        messagingCard.strokeColor = if (profile == StrategyProfiles.Profile.Messaging) selectedColor else normalColor
-        gamesCard.strokeColor = if (profile == StrategyProfiles.Profile.Games) selectedColor else normalColor
-        strongCard.strokeColor = if (profile == StrategyProfiles.Profile.Strong) selectedColor else normalColor
-        autoCard.strokeWidth = if (profile == StrategyProfiles.Profile.Auto) 2 else 1
-        balancedCard.strokeWidth = if (profile == StrategyProfiles.Profile.Balanced) 2 else 1
-        messagingCard.strokeWidth = if (profile == StrategyProfiles.Profile.Messaging) 2 else 1
-        gamesCard.strokeWidth = if (profile == StrategyProfiles.Profile.Games) 2 else 1
-        strongCard.strokeWidth = if (profile == StrategyProfiles.Profile.Strong) 2 else 1
-        val states = mapOf(
-            autoCard to (profile == StrategyProfiles.Profile.Auto),
-            balancedCard to (profile == StrategyProfiles.Profile.Balanced),
-            messagingCard to (profile == StrategyProfiles.Profile.Messaging),
-            gamesCard to (profile == StrategyProfiles.Profile.Games),
-            strongCard to (profile == StrategyProfiles.Profile.Strong),
-        )
-        states.forEach { (card, checked) ->
+        cards.forEach { (candidate, card) ->
+            val checked = candidate == profile
             card.isChecked = checked
-            ViewCompat.setStateDescription(
-                card,
-                getString(if (checked) R.string.strategy_selected else R.string.strategy_not_selected),
-            )
+            card.strokeColor = ContextCompat.getColor(this,
+                if (checked) R.color.zapret_ink else R.color.zapret_line)
+            card.strokeWidth = ((if (checked) 1.5f else 1f) * resources.displayMetrics.density).toInt()
+            ViewCompat.setStateDescription(card,
+                getString(if (checked) R.string.strategy_selected else R.string.strategy_not_selected))
         }
     }
-
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putString("selected_profile", selected.id)
+        super.onSaveInstanceState(outState)
+    }
     override fun onSupportNavigateUp(): Boolean {
         onBackPressedDispatcher.onBackPressed()
         return true

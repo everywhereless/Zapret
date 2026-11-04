@@ -10,6 +10,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.net.Uri
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -27,7 +28,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
@@ -90,14 +90,19 @@ class TelegramWsProxyService : Service() {
             // The app is in the foreground when this is called. Starting a
             // normal service here avoids creating a second foreground start
             // just to deliver a stop command.
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (error: RuntimeException) {
+                _starting.value = false
+                throw error
+            }
         }
 
         suspend fun awaitReady(timeoutMs: Long = 10_000L): Boolean {
             if (_running.value) return true
             return withTimeoutOrNull(timeoutMs) {
-                running.filter { it }.first()
-                true
+                kotlinx.coroutines.flow.combine(running, starting) { ready, busy -> ready to busy }
+                    .first { (ready, busy) -> ready || !busy }.first
             } ?: false
         }
 
@@ -317,6 +322,24 @@ class TelegramWsProxyService : Service() {
             .setContentTitle(getString(R.string.app_name))
             .setContentText(text)
             .setContentIntent(launch)
+            .apply {
+                if (_running.value) {
+                    val link = Uri.Builder().scheme("tg").authority("proxy")
+                        .appendQueryParameter("server", "127.0.0.1")
+                        .appendQueryParameter("port", _port.value.toString())
+                        .appendQueryParameter("secret", secretForLink(this@TelegramWsProxyService))
+                        .build()
+                    addAction(0, getString(R.string.telegram_quick_open),
+                        PendingIntent.getActivity(this@TelegramWsProxyService, 206,
+                            Intent(Intent.ACTION_VIEW, link).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+                    addAction(0, getString(R.string.proxy_stop),
+                        PendingIntent.getService(this@TelegramWsProxyService, 207,
+                            Intent(this@TelegramWsProxyService, TelegramWsProxyService::class.java)
+                                .setAction(ACTION_STOP),
+                            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+                }
+            }
             .setOngoing(true)
             .build()
     }

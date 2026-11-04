@@ -7,7 +7,6 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.SweepGradient
 import android.os.Build
 import android.util.AttributeSet
 import android.view.View
@@ -52,6 +51,21 @@ class RouteDialView @JvmOverloads constructor(
     private var stateAnimator: ValueAnimator? = null
     private var activeAmount = 0f
 
+    override fun performClick(): Boolean = super.performClick()
+
+    override fun setPressed(pressed: Boolean) {
+        super.setPressed(pressed)
+        animate().cancel()
+        val amount = if (pressed && isEnabled) 0.97f else 1f
+        if (!animationsEnabled()) {
+            scaleX = amount
+            scaleY = amount
+            return
+        }
+        animate().scaleX(amount).scaleY(amount)
+            .setDuration(if (pressed) 150L else 240L).start()
+    }
+
     fun setRunning(value: Boolean) {
         if (running == value) return
         running = value
@@ -66,6 +80,7 @@ class RouteDialView @JvmOverloads constructor(
     }
 
     override fun onDetachedFromWindow() {
+        animate().cancel()
         stopAnimation()
         stateAnimator?.cancel()
         stateAnimator = null
@@ -145,12 +160,7 @@ class RouteDialView @JvmOverloads constructor(
         )
         linePaint.strokeWidth = dp(3f)
         linePaint.alpha = (100f + 155f * activity).toInt()
-        linePaint.shader = SweepGradient(
-            cx,
-            cy,
-            intArrayOf(violet, blue, violetSoft, rose, violet),
-            floatArrayOf(0f, 0.24f, 0.5f, 0.76f, 1f),
-        )
+        linePaint.color = ColorUtils.blendARGB(quietStrong, violet, activity)
 
         canvas.save()
         canvas.rotate(offset, cx, cy)

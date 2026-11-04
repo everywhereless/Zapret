@@ -21,8 +21,9 @@ android {
         applicationId = "io.github.lolososka.zapretmobile"
         minSdk = 21
         targetSdk = 34
-        versionCode = 25
-        versionName = "0.3.4"
+        versionCode = 26
+        versionName = "0.4.0"
+        manifestPlaceholders["applicationLabel"] = "@string/app_name"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -46,6 +47,12 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
+            // Optional side-by-side QA build; never replaces the signed public app.
+            if (providers.gradleProperty("sideBySidePreview").orNull == "true") {
+                applicationIdSuffix = ".preview"
+                versionNameSuffix = "-preview"
+                manifestPlaceholders["applicationLabel"] = "@string/preview_app_name"
+            }
             buildConfigField("String", "VERSION_NAME",  "\"${defaultConfig.versionName}-debug\"")
         }
     }
@@ -94,8 +101,33 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
 }
 
+val windowsHost = System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+val preparedNative = layout.buildDirectory.dir("generated/windowsJni")
+val prepareWindowsNativeSources = tasks.register<Sync>("prepareWindowsNativeSources") {
+    onlyIf { windowsHost }
+    from("src/main/jni")
+    into(preparedNative)
+    exclude("**/.git", "**/.git/**")
+    doLast {
+        // Git without Windows symlink privileges checks headers out as one-line paths.
+        // Expand only those forwarding headers in the disposable build copy, never in submodules.
+        val root = preparedNative.get().asFile.canonicalFile
+        root.walkTopDown().filter { it.isFile && it.extension == "h" && it.length() < 256 }.forEach { header ->
+            val link = header.readText().trim()
+            if (Regex("^\\.\\./[A-Za-z0-9_./-]+$").matches(link)) {
+                val target = header.parentFile.resolve(link).canonicalFile
+                require(target.toPath().startsWith(root.toPath()) && target.isFile) {
+                    "Native forwarding header leaves prepared sources: ${header.name}"
+                }
+                header.writeBytes(target.readBytes())
+            }
+        }
+    }
+}
+
 tasks.register<Exec>("runNdkBuild") {
     group = "build"
+    if (windowsHost) dependsOn(prepareWindowsNativeSources)
 
     val ndkDir = android.ndkDirectory
     executable = if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
@@ -104,10 +136,11 @@ tasks.register<Exec>("runNdkBuild") {
         "$ndkDir/ndk-build"
     }
     setArgs(listOf(
-        "NDK_PROJECT_PATH=build/intermediates/ndkBuild",
-        "NDK_LIBS_OUT=src/main/jniLibs",
-        "APP_BUILD_SCRIPT=src/main/jni/Android.mk",
-        "NDK_APPLICATION_MK=src/main/jni/Application.mk"
+        "NDK_PROJECT_PATH=${layout.buildDirectory.dir("intermediates/ndkBuild").get().asFile}",
+        "NDK_LIBS_OUT=${file("src/main/jniLibs")}",
+        "APP_BUILD_SCRIPT=${if (windowsHost) preparedNative.get().file("Android.mk").asFile else file("src/main/jni/Android.mk")}",
+        "NDK_APPLICATION_MK=${if (windowsHost) preparedNative.get().file("Application.mk").asFile else file("src/main/jni/Application.mk")}",
+        "-j${Runtime.getRuntime().availableProcessors().coerceIn(1, 8)}"
     ))
 
     println("Command: $commandLine")

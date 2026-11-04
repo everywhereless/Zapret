@@ -33,6 +33,14 @@ class MainScreenSmokeTest {
                 assertTrue("Legacy start button is still visible", oldStart.visibility != View.VISIBLE)
                 assertTrue("Strategy badge has no label", strategy.text.isNotBlank())
                 assertTrue("Settings action is clipped", settings.isShown && settings.width > 0)
+                val proxyToggle = activity.findViewById<View>(R.id.telegram_switch)
+                val proxyApply = activity.findViewById<View>(R.id.telegram_setup_button)
+                val bounds = android.graphics.Rect()
+                assertTrue("Proxy switch is not visible without scrolling", proxyToggle.getGlobalVisibleRect(bounds))
+                assertTrue("Proxy switch touch target too small",
+                    proxyToggle.height >= 48 * activity.resources.displayMetrics.density)
+                assertTrue("Proxy apply action is hidden", proxyApply.isShown && proxyApply.isClickable)
+                assertTrue("Telegram no longer precedes the dial", proxyToggle.bottom < dial.bottom)
             }
             screenshot("main.png")
         }
@@ -48,6 +56,8 @@ class MainScreenSmokeTest {
                 val apply = activity.findViewById<TextView>(R.id.strategy_apply_button)
                 assertTrue("Strategy picker action has no label", apply.text.isNotBlank())
                 assertTrue("Strategy picker action is disabled", apply.isEnabled)
+                assertTrue("No-fake split profile is missing",
+                    activity.findViewById<View>(R.id.strategy_split_card) != null)
             }
             screenshot("strategy.png")
         }
