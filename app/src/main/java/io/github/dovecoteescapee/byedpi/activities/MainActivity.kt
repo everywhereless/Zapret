@@ -1272,8 +1272,8 @@ class MainActivity : AppCompatActivity() {
         binding.connectionUptime.text = getString(R.string.session_uptime, "00:00:00")
         binding.connectionTraffic.text = getString(
             R.string.connection_traffic,
-            "0 Б",
-            "0 Б",
+            "0 B",
+            "0 B",
         )
     }
 
@@ -1307,10 +1307,10 @@ class MainActivity : AppCompatActivity() {
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
 
     private fun formatBytes(value: Long): String = when {
-        value < 1_024L -> "$value Б"
-        value < 1_024L * 1_024L -> String.format(Locale.ROOT, "%.1f КБ", value / 1_024f)
+        value < 1_024L -> "$value B"
+        value < 1_024L * 1_024L -> String.format(Locale.ROOT, "%.1f KB", value / 1_024f)
         value < 1_024L * 1_024L * 1_024L ->
-            String.format(Locale.ROOT, "%.1f МБ", value / (1_024f * 1_024f))
-        else -> String.format(Locale.ROOT, "%.2f ГБ", value / (1_024f * 1_024f * 1_024f))
+            String.format(Locale.ROOT, "%.1f MB", value / (1_024f * 1_024f))
+        else -> String.format(Locale.ROOT, "%.2f GB", value / (1_024f * 1_024f * 1_024f))
     }
 }
