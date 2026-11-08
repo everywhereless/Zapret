@@ -1,62 +1,63 @@
-# Подготовка релиза
+# Release Preparation
 
-Этот документ задаёт правила будущих выпусков. Само наличие файла или успешная CI-сборка не создаёт релиз.
+This document sets the rules for future releases. The mere presence of this file or a successful CI build does not create a release.
 
-## Формат версии
+## Version format
 
-- Версия приложения следует SemVer: `X.Y.Z`.
-- Тег форка имеет вид `android-vX.Y.Z`, чтобы не пересекаться с тегами upstream.
-- `versionCode` только увеличивается; `versionName` совпадает с `X.Y.Z`.
-- Тег создаётся только на проверенном commit из защищённой основной ветки.
+- The app version follows SemVer: `X.Y.Z`.
+- The fork's tag has the form `android-vX.Y.Z`, so that it does not collide with upstream tags.
+- `versionCode` only ever increases; `versionName` matches `X.Y.Z`.
+- A tag is created only on a verified commit from the protected main branch.
 
-## Перед выпуском
+## Before a release
 
-1. Синхронизировать нужные изменения из `upstream` обычным merge или отдельным PR, не переписывая опубликованную историю.
-2. Убедиться, что `git status` чистый, а подмодули находятся ровно на зафиксированных ревизиях.
-3. Обновить версию приложения, changelog, README и `THIRD_PARTY_NOTICES.md` при изменении зависимостей.
-4. Дождаться успешных lint, unit tests и debug-сборки в GitHub Actions.
-5. Собрать release APK из чистого checkout тега с рекурсивными подмодулями и JDK 17.
-6. Подписать APK отдельным release-ключом и проверить подпись через `apksigner verify --verbose --print-certs`.
-7. Проверить установку и запуск на поддерживаемой версии Android.
+1. Sync the needed changes from `upstream` with a regular merge or a separate PR, without rewriting published history.
+2. Make sure `git status` is clean and the submodules are at exactly the pinned revisions.
+3. Update the app version, the changelog, the README, and `THIRD_PARTY_NOTICES.md` if dependencies changed.
+4. Wait for lint, unit tests, and the debug build to pass in GitHub Actions.
+5. Build the release APK from a clean checkout of the tag with recursive submodules and JDK 17.
+6. Sign the APK with a separate release key and verify the signature with `apksigner verify --verbose --print-certs`.
+7. Check installation and launch on a supported Android version.
 
-## Ключ подписи
+## Signing key
 
-- Keystore и его пароли никогда не добавляются в Git, Actions artifacts, журналы или APK-архив с исходниками.
-- Для автоматизации секреты допускаются только в защищённом GitHub Environment `release` с ручным подтверждением владельца.
-- Workflow из pull request, особенно из чужого форка, не должен получать release-секреты.
-- Отпечаток сертификата первого стабильного выпуска сохраняется в release notes; последующие APK должны иметь тот же сертификат.
+- The keystore and its passwords are never added to Git, Actions artifacts, logs, or the source code APK archive.
+- For automation, secrets are allowed only in the protected GitHub Environment `release` with manual approval by the owner.
+- A workflow from a pull request, especially from someone else's fork, must not receive release secrets.
+- The certificate fingerprint of the first stable release is saved in the release notes; subsequent APKs must have the same certificate.
 
-## Публикация
+## Publishing
 
-1. Создать аннотированный тег `android-vX.Y.Z` (по возможности также подписать его GPG/SSH-ключом владельца).
-2. Подготовить draft GitHub Release, не публикуя его до ручной проверки.
-3. Приложить:
+1. Create an annotated tag `android-vX.Y.Z` (where possible, also sign it with the owner's GPG/SSH key).
+2. Prepare a draft GitHub Release, without publishing it until a manual check.
+3. Attach:
    - `zapret-mobile-X.Y.Z.apk`;
    - `zapret-mobile-X.Y.Z.apk.sha256`;
-   - `zapret-mobile-X.Y.Z-source.tar.gz` с содержимым подмодулей;
-   - SHA-256 архива соответствующего исходного кода;
-   - список заметных изменений;
-   - ссылку на точный тег с соответствующим исходным кодом;
-   - ревизии подмодулей и актуальные лицензионные уведомления.
-4. Скачать приложенный APK обратно, повторно проверить подпись и SHA-256.
-5. Опубликовать Release и только затем обновить ссылку на сайте.
+   - `zapret-mobile-X.Y.Z-source.tar.gz` including the contents of the submodules;
+   - the SHA-256 of the corresponding source code archive;
+   - a list of notable changes;
+   - a link to the exact tag with the corresponding source code;
+   - the submodule revisions and up-to-date license notices.
+4. Download the attached APK back, and re-verify the signature and SHA-256.
+5. Publish the Release and only then update the link on the website.
 
-Workflow `Android release` запускается только после отправки тега `android-v*` и создаёт **черновик** GitHub Release. Публикация черновика остаётся ручной. Debug APK из CI нельзя переименовывать в стабильный или прикладывать к Release.
+The `Android release` workflow runs only after a tag matching `android-v*` is pushed and creates a **draft** GitHub Release. Publishing the draft remains manual. A debug APK from CI must not be renamed to a stable one or attached to a Release.
 
-Сборка и подпись выполняются в разных заданиях на отдельных runner:
+Building and signing are performed in separate jobs on separate runners:
 
-- `build` имеет только `contents: read` и не получает Environment `release` или секреты подписи. Оно проверяет аннотированный тег, совпадение версии, принадлежность commit основной ветке и точные ревизии подмодулей. Архив соответствующего исходного кода создаётся до запуска Gradle и включает рекурсивные подмодули.
-- `sign` получает Environment `release` и `contents: write`, но не делает checkout и не запускает код сборки из репозитория. Оно скачивает кандидат по неизменяемому ID артефакта, проверяет точный набор файлов и SHA-256, затем восстанавливает keystore и подписывает APK.
+- `build` has only `contents: read` and does not receive the `release` Environment or signing secrets. It verifies the annotated tag, the version match, that the commit belongs to the main branch, and the exact submodule revisions. The corresponding source code archive is created before Gradle starts and includes the recursive submodules.
+- `sign` receives the `release` Environment and `contents: write`, but does not perform a checkout and does not run build code from the repository. It downloads the candidate by the immutable artifact ID, verifies the exact set of files and their SHA-256, then restores the keystore and signs the APK.
 
-До передачи на подпись проверяются все упакованные нативные `.so`: каждый ELF LOAD-сегмент должен иметь выравнивание не менее 16 КиБ. В задании подписи Build Tools `35.0.0` выполняет `zipalign -P 16`; готовый APK повторно проверяется через `zipalign` и `apksigner`. Это проверяет формат APK, но не заменяет запуск на реальном устройстве с размером страницы 16 КиБ.
+Before handoff for signing, all packaged native `.so` files are checked: every ELF LOAD segment must have an alignment of at least 16 KiB. In the signing job, Build Tools `35.0.0` runs `zipalign -P 16`; the finished APK is re-verified with `zipalign` and `apksigner`. This verifies the APK format but does not replace running on a real device with a 16 KiB page size.
 
-### Обязательные GitHub Secrets
+### Required GitHub Secrets
 
-Секреты рекомендуется хранить в защищённом Environment `release`:
+It is recommended to store the secrets in the protected Environment `release`:
 
-- `ANDROID_SIGNING_KEYSTORE_BASE64` — keystore целиком в Base64 без переносов;
-- `ANDROID_SIGNING_KEYSTORE_PASSWORD` — пароль keystore;
-- `ANDROID_SIGNING_KEY_ALIAS` — alias ключа;
-- `ANDROID_SIGNING_KEY_PASSWORD` — пароль закрытого ключа.
+- `ANDROID_SIGNING_KEYSTORE_BASE64` — the entire keystore in Base64 without line breaks;
+- `ANDROID_SIGNING_KEYSTORE_PASSWORD` — the keystore password;
+- `ANDROID_SIGNING_KEY_ALIAS` — the key alias;
+- `ANDROID_SIGNING_KEY_PASSWORD` — the private key password.
 
-Если хотя бы одного секрета нет, задание подписи завершается до подписания и создания черновика; задание сборки может успешно завершиться без этих секретов. Создавать пустые заглушки нельзя.
+If at least one secret is missing, the signing job terminates before signing and before creating the draft; the build job may complete successfully without these secrets. Empty placeholders must not be created.
+

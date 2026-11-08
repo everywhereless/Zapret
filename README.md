@@ -1,67 +1,67 @@
 # Zapret Mobile
 
 [![Android CI](https://github.com/lolososka/zapret-control-center-android/actions/workflows/android-ci.yml/badge.svg)](https://github.com/lolososka/zapret-control-center-android/actions/workflows/android-ci.yml)
-[![Лицензия: GPL v3](https://img.shields.io/badge/license-GPLv3-151515.svg)](LICENSE)
+[![License: GPL v3](https://img.shields.io/badge/license-GPLv3-151515.svg)](LICENSE)
 
-Android-приложение от **lolososka** в стиле Zapret Control Center. Оно запускает локальный VPN-интерфейс Android и направляет трафик через встроенный в APK [форк ByeDPI](https://github.com/lolososka/byedpi). Отдельное приложение или удалённый VPN-сервер не запускаются, root-права не нужны.
+An Android app by **lolososka** in the style of Zapret Control Center. It starts a local Android VPN interface and routes traffic through the [ByeDPI fork](https://github.com/lolososka/byedpi) built into the APK. No separate app or remote VPN server is launched, and root access is not required.
 
-> 0.4.0 — монохромный интерфейс в стиле ПК, быстрый Telegram-прокси и отдельный подбор для YouTube/Discord. Уведомление об обновлении и встроенная загрузка доступны после проверки подписки на @Slag0dworld. Работа обхода на конкретном телефоне и у конкретного провайдера требует проверки.
+> 0.4.0 — a monochrome interface in the style of the PC version, a fast Telegram proxy, and a dedicated selection for YouTube/Discord. Update notifications and built-in downloading become available after verifying the subscription to @Slag0dworld. How well the bypass works on a specific phone and with a specific provider needs to be verified.
 
-Профиль «Мессенджеры» помогает соединениям с нестабильным UDP, а «Игровой трафик» включает консервативную обработку UDP без привязки к отдельному сервису.
+The "Messengers" profile helps connections with unstable UDP, while "Game traffic" enables conservative UDP handling that is not tied to any particular service.
 
-## Что важно знать
+## What you need to know
 
-### Новое в 0.4.0
+### New in 0.4.0
 
-- Чёрная и светлая монохромные темы в стиле версии для ПК; значок меняется вместе с темой.
-- Telegram-прокси находится над основной кнопкой. Переключатель запускает/останавливает
-  его, «Подключить» сразу открывает настройку в Telegram. Дополнительные действия —
-  длительное нажатие. Состояние обновляется из службы без повторного открытия экрана.
-- Отдельная плитка «Telegram-прокси» в шторке и действия в уведомлении работающего прокси.
-- Быстрые проверка и подбор для YouTube, Discord или обоих сервисов. Проверяется HTTP
-  после TLS и UDP DNS через SOCKS5, а не только открытие TCP/TLS. HTTP-редиректы не
-  засчитываются. Это не проверка загрузки реального видео или голосового сеанса.
-- Профили «Разделение» и «TLS без подмены» не добавляют подменных UDP-пакетов.
-  Подбор оценивает фактический результат UDP, а не наличие подмены в настройках.
-- Согласованный MTU Android VPN и нативного туннеля: 1500 по умолчанию,
-  варианты 1400/1280 в настройках. Изменение применяется после переподключения.
-- Кнопка отмены подбора; при ошибке или отмене не сбрасывается пользовательская конфигурация.
-- На главной показан счётчик нативного VPN, а не общий трафик телефона.
-  Фоновый прямой ping удалён: он не показывал доступность обхода.
+- Black and light monochrome themes in the style of the PC version; the icon changes along with the theme.
+- The Telegram proxy sits above the main button. The switch starts/stops
+  it, and "Connect" immediately opens the setup in Telegram. Additional actions are
+  available via long press. The state is updated from the service without reopening the screen.
+- A separate "Telegram proxy" tile in the quick settings panel and actions in the notification of the running proxy.
+- Quick check and selection for YouTube, Discord, or both services. HTTP
+  after TLS and UDP DNS are checked through SOCKS5, not just whether TCP/TLS opens. HTTP redirects are not
+  counted as success. This is not a check of loading a real video or a voice session.
+- The "Split" and "TLS without spoofing" profiles do not add fake UDP packets.
+  The selection evaluates the actual UDP result, not whether spoofing is enabled in the settings.
+- Matched MTU for the Android VPN and the native tunnel ("VPN packet size (MTU)"): 1500 by default,
+  with 1400/1280 options in the settings. A change is applied after reconnecting.
+- A cancel button for the selection; on error or cancellation, the user's configuration is not reset.
+- The home screen shows the native VPN counter, not the phone's total traffic.
+  The background direct ping has been removed: it did not show whether the bypass was reachable.
 
-Подготовить отдельный APK для просмотра, не заменяющий рабочее приложение:
+To prepare a separate APK for preview that does not replace the working app:
 `gradlew.bat testDebugUnitTest lintDebug assembleDebug -PsideBySidePreview=true`.
-Пакет `io.github.lolososka.zapretmobile.preview`, имя «Zapret Preview», debug-подпись.
-Preview не является публичным обновлением и не заменяет установленную стабильную версию.
-На Windows нативные forwarding-заголовки разворачиваются только в `app/build/generated/windowsJni`.
+The package is `io.github.lolososka.zapretmobile.preview`, the name is "Zapret Preview", with a debug signature.
+Preview is not a public update and does not replace the installed stable version.
+On Windows, the native forwarding headers are expanded only into `app/build/generated/windowsJni`.
 
-### Ограничения проверки
+### Verification limitations
 
-YouTube использует реальные медиасерверы, отличающиеся от проверочного HTTP-узла.
-Голос Discord устанавливает отдельное UDP-соединение; успешный DNS UDP не подтверждает
-доступность конкретного голосового сервера. Перед выпуском нужно проверить видео и
-звонок на целевом телефоне в Wi-Fi и мобильной сети.
-Справка: [Android VPN](https://developer.android.com/reference/android/net/VpnService.Builder),
-[голос Discord](https://docs.discord.com/developers/topics/voice-connections).
+YouTube uses real media servers that differ from the HTTP test node.
+Discord voice establishes a separate UDP connection; a successful UDP DNS check does not confirm
+the availability of a specific voice server. Before a release, check video and
+calls on the target phone over both Wi-Fi and mobile network.
+References: [Android VPN](https://developer.android.com/reference/android/net/VpnService.Builder),
+[Discord voice](https://docs.discord.com/developers/topics/voice-connections).
 
-- поддерживается Android 5.0 и новее (`minSdk 21`);
-- обработка происходит на устройстве, собственного удалённого VPN-сервера у проекта нет;
-- приложение не меняет внешний IP-адрес и не добавляет шифрование поверх HTTPS;
-- Android показывает системный значок VPN, потому что для перенаправления трафика используется `VpnService`;
-- одновременно обычно может работать только одно VPN-приложение, поэтому возможен конфликт с AdGuard, другими VPN и сетевыми фильтрами;
-- подходящая стратегия зависит от сети и провайдера.
+- Android 5.0 and newer is supported (`minSdk 21`);
+- processing happens on the device; the project has no remote VPN server of its own;
+- the app does not change your external IP address and does not add encryption on top of HTTPS;
+- Android shows the system VPN icon because `VpnService` is used to redirect traffic;
+- usually only one VPN app can run at a time, so conflicts with AdGuard, other VPNs, and network filters are possible;
+- the suitable strategy depends on the network and the provider.
 
-## Установка
+## Installation
 
-Подписанные APK публикуются в [GitHub Releases](https://github.com/lolososka/zapret-control-center-android/releases) и на [сайте Zapret Control Center](https://lolososka.github.io/zapret-discord-youtube/#android). Скачайте APK на телефон, разрешите установку из выбранного браузера, откройте приложение и подтвердите системный запрос VPN при первом подключении.
+Signed APKs are published in [GitHub Releases](https://github.com/lolososka/zapret-control-center-android/releases) and on the [Zapret Control Center website](https://lolososka.github.io/zapret-discord-youtube/#android). Download the APK to your phone, allow installation from the browser you chose, open the app, and confirm the system VPN prompt on the first connection.
 
-Контрольная сумма SHA-256 и архив исходного кода с подмодулями приложены к каждому выпуску. Debug APK из Actions предназначен для разработки и подписан другим ключом.
+A SHA-256 checksum and a source code archive with submodules are attached to every release. The debug APK from Actions is intended for development and is signed with a different key.
 
-## Сборка из исходников
+## Building from source
 
-Текущий проект намеренно сохраняет проверенный стек исходного форка:
+The current project deliberately keeps the proven stack of the original fork:
 
-| Компонент | Версия |
+| Component | Version |
 | --- | --- |
 | Android Gradle Plugin | 8.3.0 |
 | Gradle Wrapper | 8.4 |
@@ -69,9 +69,9 @@ YouTube использует реальные медиасерверы, отли
 | compileSdk / targetSdk | 34 / 34 |
 | Android NDK | 26.1.10909125 |
 | CMake | 3.22.1 |
-| Java для Gradle | 17 |
+| Java for Gradle | 17 |
 
-Понадобятся Android SDK 34, Android NDK 26.1.10909125 и CMake 3.22.1. Клонировать репозиторий нужно вместе с подмодулями:
+You will need Android SDK 34, Android NDK 26.1.10909125, and CMake 3.22.1. The repository must be cloned together with its submodules:
 
 ```powershell
 git clone --recurse-submodules https://github.com/lolososka/zapret-control-center-android.git
@@ -79,28 +79,29 @@ cd zapret-control-center-android
 .\gradlew.bat lintDebug testDebugUnitTest assembleDebug
 ```
 
-Debug APK появится в `app/build/outputs/apk/debug/`.
+The debug APK will appear in `app/build/outputs/apk/debug/`.
 
-Порядок подготовки публичной версии описан в [RELEASING.md](RELEASING.md). Он отделяет проверочные debug-сборки от подписанных выпусков.
+The procedure for preparing a public release is described in [RELEASING.md](RELEASING.md). It separates verification debug builds from signed releases.
 
-## Происхождение проекта
+## Project origin
 
-Это самостоятельный форк [ByeDPIAndroid](https://github.com/dovecoteescapee/ByeDPIAndroid), который развивает **dovecoteescapee**. История Git сохранена, а удалённый репозиторий `upstream` используется для аккуратной синхронизации с оригиналом.
+This is an independent fork of [ByeDPIAndroid](https://github.com/dovecoteescapee/ByeDPIAndroid), which is developed by **dovecoteescapee**. The Git history is preserved, and the `upstream` remote is used to sync carefully with the original.
 
-Основные компоненты:
+Main components:
 
-- [ByeDPIAndroid](https://github.com/dovecoteescapee/ByeDPIAndroid) — исходная Android-реализация;
-- [форк ByeDPI](https://github.com/lolososka/byedpi) на основе [hufrea/byedpi](https://github.com/hufrea/byedpi) — встроенный локальный SOCKS5-прокси и DPI-десинхронизация;
-- [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) — туннель между Android VPN и SOCKS5.
+- [ByeDPIAndroid](https://github.com/dovecoteescapee/ByeDPIAndroid) — the original Android implementation;
+- the [ByeDPI fork](https://github.com/lolososka/byedpi) based on [hufrea/byedpi](https://github.com/hufrea/byedpi) — the built-in local SOCKS5 proxy and DPI desynchronization;
+- [hev-socks5-tunnel](https://github.com/heiher/hev-socks5-tunnel) — the tunnel between the Android VPN and SOCKS5.
 
-Название Zapret Mobile относится к этому форку. Приложение не является официальным клиентом проектов ByeDPI, ByeDPIAndroid или `bol-van/zapret` и не содержит Windows-компоненты WinDivert.
+The name Zapret Mobile refers to this fork. The app is not an official client of the ByeDPI, ByeDPIAndroid, or `bol-van/zapret` projects and does not contain the Windows WinDivert components.
 
-## Конфиденциальность
+## Privacy
 
-В приложении нет учётной записи, аналитики и телеметрии проекта. Обычный сетевой трафик по-прежнему уходит к сайтам и сервисам, которые открывает пользователь. Перед установкой сторонней сборки сравните её источник и SHA-256 с официальным выпуском.
+The app has no account, analytics, or project telemetry. Regular network traffic still goes to the sites and services the user opens. Before installing a third-party build, compare its source and SHA-256 with the official release.
 
-## Лицензия и благодарности
+## License and acknowledgments
 
-Основной код приложения и изменения этого форка распространяются по [GNU General Public License v3](LICENSE). Авторские права исходных разработчиков сохранены. Список встроенных компонентов и их лицензий находится в [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+The app's main code and the changes in this fork are distributed under the [GNU General Public License v3](LICENSE). The copyrights of the original developers are preserved. The list of bundled components and their licenses is in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
-Ошибки и предложения принимаются в [Issues](https://github.com/lolososka/zapret-control-center-android/issues). О проблемах безопасности сообщайте по инструкции в [SECURITY.md](SECURITY.md).
+Bugs and suggestions are accepted in [Issues](https://github.com/lolososka/zapret-control-center-android/issues). Report security issues following the instructions in [SECURITY.md](SECURITY.md).
+

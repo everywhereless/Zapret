@@ -1,21 +1,22 @@
-# Политика безопасности
+# Security Policy
 
-## Как сообщить об уязвимости
+## How to report a vulnerability
 
-Не публикуйте данные об уязвимости в обычном Issue. Используйте приватную форму [GitHub Security Advisories](https://github.com/lolososka/zapret-control-center-android/security/advisories/new) и укажите:
+Do not publish vulnerability details in a regular Issue. Use the private [GitHub Security Advisories](https://github.com/lolososka/zapret-control-center-android/security/advisories/new) form and include:
 
-- версию Android и модель устройства;
-- версию приложения или commit SHA;
-- пошаговое воспроизведение;
-- возможные последствия;
-- минимальный пример или журнал без паролей, токенов и других личных данных.
+- the Android version and device model;
+- the app version or commit SHA;
+- step-by-step reproduction;
+- possible consequences;
+- a minimal example or log without passwords, tokens, or other personal data.
 
-Подтверждение будет дано после воспроизведения. Срок исправления зависит от серьёзности и сложности проблемы. Публиковать детали до выпуска исправления не следует.
+Acknowledgment will be given after the issue is reproduced. The time to a fix depends on the severity and complexity of the problem. Details should not be published before a fix is released.
 
-## Какие версии поддерживаются
+## Supported versions
 
-Пока самостоятельного стабильного релиза нет, отчёты принимаются для текущей ветки `master`. После первого выпуска исправления безопасности будут готовиться для последней опубликованной версии; старые версии могут не поддерживаться.
+Until there is an independent stable release, reports are accepted for the current `master` branch. After the first release, security fixes will be prepared for the latest published version; older versions may not be supported.
 
-## Проверка APK
+## Verifying the APK
 
-Устанавливайте стабильные сборки только из [Releases](https://github.com/lolososka/zapret-control-center-android/releases) или по ссылке с официального сайта. Сверяйте SHA-256. Артефакты `debug` из GitHub Actions не считаются релизом и не предназначены для повседневной установки.
+Install stable builds only from [Releases](https://github.com/lolososka/zapret-control-center-android/releases) or via a link from the official website. Verify the SHA-256. `debug` artifacts from GitHub Actions are not considered a release and are not intended for everyday installation.
+
